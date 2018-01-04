@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -58,42 +59,57 @@ func main() {
 
 	calculateDiffinGeneration(generation, testCases)
 
-	for _, n := range generation {
-		fmt.Println("diff: ", n.diff)
-	}
+	//ordena de menor a mayor
+	sort.Slice(generation, func(i, j int) bool {
+		return generation[i].diff < generation[j].diff
+	})
 
 	//borra 2
-	generation = deleteWorstElements(generation)
-	generation = deleteWorstElements(generation)
+	generation = deleteWorstElements(generation, 2)
 
-	//reproduce 2
+	//procrea
+	children := createChildren(generation, len(generation)*4)
 
-	fmt.Println("Cantidad: ", len(generation))
-
-	for _, n := range generation {
-		fmt.Println("diff: ", n.diff)
-	}
-
-	//net.printNetwork()
+	fmt.Println(children)
 
 }
 
-func deleteWorstElements(generation []*Net) []*Net {
+func createChildren(generation []*Net, cant int) []*Net {
 
-	var maxDiff float64
-	var worstElementid int
+	children := []*Net{}
 
-	for id, n := range generation {
-		if n.diff > maxDiff {
-			maxDiff = n.diff
-			worstElementid = id
-		}
+	for i := 0; i < cant; i++ {
+
+		//agarra dos random de la generación
+		j := rand.Intn(len(generation))
+		k := rand.Intn(len(generation))
+
+		net1 := generation[j]
+		net2 := generation[k]
+
+		//los procrea
+		son := createSon(net1, net2)
+
+		//los guarda en la colección
+		children = append(children, son)
+
 	}
+
+	return children
+
+}
+
+func createSon(net1 *Net, net2 *Net) *Net {
+	//TODO:
+	return net1
+}
+
+func deleteWorstElements(generation []*Net, cant int) []*Net {
 
 	cleanGeneration := []*Net{}
 
 	for id, n := range generation {
-		if id != worstElementid {
+		if id < (len(generation) - cant) {
 			cleanGeneration = append(cleanGeneration, n)
 		}
 	}
