@@ -19,28 +19,8 @@ func main() {
 	generation := []*Net{}
 
 	//Crea 10 redes
-	for i := 0; i < 10; i++ {
-
-		net := &Net{}
-
-		inputLayer := &Layer{name: "Input Layer"}
-		inputLayer.addNeurons(2)
-
-		hiddenLayer := &Layer{name: "Hidden Layer"}
-		hiddenLayer.addNeurons(3)
-
-		outputLayer := &Layer{name: "Output Layer"}
-		outputLayer.addNeurons(1)
-
-		inputLayer.connectToLayer(hiddenLayer)
-		hiddenLayer.connectToLayer(outputLayer)
-
-		net.addLayer(inputLayer)
-		net.addLayer(hiddenLayer)
-		net.addLayer(outputLayer)
-
-		net.randomizeWeights()
-
+	for i := 0; i < 10; i++ {		
+		net := createNet(2,2,1)
 		generation = append(generation, net)
 
 	}
@@ -59,49 +39,167 @@ func main() {
 
 	calculateDiffinGeneration(generation, testCases)
 
+	originanlCanti := len(generation)
 	//ordena de menor a mayor
-	sort.Slice(generation, func(i, j int) bool {
-		return generation[i].diff < generation[j].diff
-	})
+	ordena(generation)
+	fmt.Println("best: ", generation[0].diff)
+	fmt.Println("worst: ", generation[len(generation)-1].diff)
 
-	//borra 2
-	generation = deleteWorstElements(generation, 2)
+	for i:=0; i<100; i++{
+		//borra 2
+		generation = deleteWorstElements(generation, len(generation)/5)
 
-	//procrea
-	children := createChildren(generation, len(generation)*4)
+		//procrea
+		children := createChildren(generation)
 
-	fmt.Println(children)
+		//calcula el test sobre la nueva generación
+		calculateDiffinGeneration(children, testCases)
+
+		ordena(children)
+		
+		//mezcla las generaciones
+		generation = mergeElements(generation, children)
+
+		//ordena de menor a mayor
+		ordena(generation)
+
+		//borra peores
+		generation = deleteWorstElements(generation, len(generation)-originanlCanti)
+
+		//printGeneration(generation)
+		//fmt.Println(averageGeneration(generation))
+		fmt.Println("best: ", generation[0].diff)
+	
+	}
 
 }
 
-func createChildren(generation []*Net, cant int) []*Net {
+func printGeneration(generation []*Net){
+	for _,n := range generation {
+		fmt.Println(n.diff)
+	}
+	
+}
+
+func createNet(input int, hidden int, output int) *Net {
+	net := &Net{}
+	net.input = input
+	net.hidden = hidden
+	net.output = output
+
+	inputLayer := &Layer{name: "Input Layer"}
+	inputLayer.addNeurons(input)
+
+	hiddenLayer := &Layer{name: "Hidden Layer"}
+	hiddenLayer.addNeurons(hidden)
+
+	outputLayer := &Layer{name: "Output Layer"}
+	outputLayer.addNeurons(output)
+
+	inputLayer.connectToLayer(hiddenLayer)
+	hiddenLayer.connectToLayer(outputLayer)
+
+	net.addLayer(inputLayer)
+	net.addLayer(hiddenLayer)
+	net.addLayer(outputLayer)
+
+	net.randomizeWeights()
+
+	return net
+}
+
+func mergeElements(generation []*Net, children []*Net) []*Net {
+	for _, n := range children {
+		generation = append(generation, n)
+	}
+	return generation
+}
+
+func ordena(generation []*Net) {
+	sort.Slice(generation, func(i, j int) bool {
+		return generation[i].diff < generation[j].diff
+	})	
+}
+
+
+func createChildren(generation []*Net) []*Net {
 
 	children := []*Net{}
 
-	for i := 0; i < cant; i++ {
+	tamanio := len(generation)/5
 
-		//agarra dos random de la generación
-		j := rand.Intn(len(generation))
-		k := rand.Intn(len(generation))
-
-		net1 := generation[j]
-		net2 := generation[k]
-
-		//los procrea
-		son := createSon(net1, net2)
-
-		//los guarda en la colección
-		children = append(children, son)
-
+	for i:=0;i<tamanio;i++{
+		for j:=i;j<tamanio;j++{
+			n := generation[i]
+			m := generation[j]
+			//los procrea			
+			son := createSon(n, m)
+			//los guarda en la colección
+			children = append(children, son)			
+		}
 	}
 
 	return children
 
 }
 
+func printWeight(net1 *Net) {
+	var suma float64
+	for _, layer := range net1.layers {
+		for _, neuron := range layer.neurons {
+			for _, input := range neuron.connections {
+				suma = suma + input.weight
+			}
+		}
+	}
+	fmt.Println("suma: ", suma)
+}
 func createSon(net1 *Net, net2 *Net) *Net {
-	//TODO:
-	return net1
+
+	pesos1 := []float64{}
+	pesos2 := []float64{}
+	
+	for _, layer := range net1.layers {
+		for _, neuron := range layer.neurons {
+			for _, input := range neuron.connections {
+				pesos1 = append(pesos1, input.weight)
+			}
+		}
+	}
+
+	for _, layer := range net2.layers {
+		for _, neuron := range layer.neurons {
+			for _, input := range neuron.connections {
+				pesos2 = append(pesos2, input.weight)
+			}
+		}
+	}
+
+	net3 := createNet(net1.input, net1.hidden, net1.output)
+
+	i:=0
+	for _, layer := range net3.layers {
+		for _, neuron := range layer.neurons {
+			for _, input := range neuron.connections {
+				input.weight = mutaGen(pesos1[i], pesos2[i])			
+				i++	
+			}
+		}
+	}
+
+	return net3
+}
+
+func mutaGen(gen1 float64, gen2 float64) float64 {
+
+	if rand.Float64()<0.05 {
+		return rand.Float64()
+	} 
+	if rand.Float64()<0.5 {
+			return gen1
+	}
+	return gen2
+
 }
 
 func deleteWorstElements(generation []*Net, cant int) []*Net {
@@ -129,15 +227,24 @@ func calculateDiffinGeneration(generation []*Net, testCases []*TestCase) {
 
 			output := n.processInput(t.input)
 			//arreglar esto para que sea agnóstico a la cantidad de outputs
-			diff := output[0] - t.output[0]
-			diff = diff * diff // lo elevo al cuadrado para sumar errores
+			diff := math.Abs(output[0] - t.output[0])
+			//fmt.Println("result: ", output[0], "target: ", t.output[0], "diff: ", diff)
 			totalDiff = totalDiff + diff
 		}
 
 		//me guardo la direrencia total en la red
-		n.diff = totalDiff
+		n.diff = totalDiff / float64(len(testCases))
 
 	}
+
+}
+
+func averageGeneration(generation []*Net) float64 {
+	var suma float64
+	for _,n := range generation {
+		suma = suma + n.diff
+	}
+	return suma / float64(len(generation))
 
 }
 
@@ -175,6 +282,9 @@ func (n *Neuron) calculateOutput() {
 
 ////////////////////////////////////////////////////////////////
 type Net struct {
+	input int
+	hidden int
+	output int
 	layers []*Layer
 	diff   float64
 }
@@ -285,3 +395,4 @@ type Connection struct {
 //http://datathings.com/blog/post/neuralnet/
 //https://becominghuman.ai/back-propagation-is-very-simple-who-made-it-complicated-97b794c97e5c
 //https://medium.com/@karpathy/yes-you-should-understand-backprop-e2f06eab496b
+//https://towardsdatascience.com/multi-layer-neural-networks-with-sigmoid-function-deep-learning-for-rookies-2-bf464f09eb7f
